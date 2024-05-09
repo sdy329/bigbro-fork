@@ -12,8 +12,9 @@ import type { ModerationLog } from '../lib/moderation';
 
 @ApplyOptions<Command.Options>({
   description: 'Ban user',
-  requiredClientPermissions: [PermissionFlagsBits.ModerateMembers],
-  requiredUserPermissions: [PermissionFlagsBits.ModerateMembers],
+  requiredClientPermissions: [PermissionFlagsBits.BanMembers],
+  requiredUserPermissions: [PermissionFlagsBits.BanMembers],
+
   runIn: [CommandOptionsRunTypeEnum.GuildAny],
 })
 export class BanCommand extends Command {
