@@ -1,57 +1,36 @@
 import { ApplyOptions } from '@sapphire/decorators';
 import { Command, CommandOptionsRunTypeEnum } from '@sapphire/framework';
 import {
-  PermissionFlagsBits,
   EmbedBuilder,
-  time,
-  TimestampStyles,
+  PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import { Color } from '../lib/embeds';
-import { DurationUnit } from '../lib/duration';
 import { messageLogger } from '..';
 import { moderationLogs } from '..';
 import type { ModerationLog } from '../lib/moderation';
 
-
 @ApplyOptions<Command.Options>({
-  description: 'Timeout user',
+  description: 'Ban user',
   requiredClientPermissions: [PermissionFlagsBits.ModerateMembers],
   requiredUserPermissions: [PermissionFlagsBits.ModerateMembers],
   runIn: [CommandOptionsRunTypeEnum.GuildAny],
 })
-export class TimeoutCommand extends Command {
-  private static readonly MaxTimeoutMilliseconds = 2_419_200_000; // 28 days
-  private static readonly MillisecondsByUnit = DurationUnit.values().reduce(
-    (map, unit) => map.set(unit.name, unit.milliseconds),
-    new Map<string, number>()
-  );
+export class BanCommand extends Command {
 
   public override async chatInputRun(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild()) {
       return;
     }
     const user = interaction.options.getUser(Option.User, true);
-    const duration = interaction.options.getNumber(Option.Duration, true);
-    const unit = interaction.options.getString(Option.Unit, true);
     const reason = interaction.options.getString(Option.Reason);
+    let purge = interaction.options.getBoolean(Option.Purge);
 
     const guild = await interaction.client.guilds.fetch(interaction.guildId);
     const member = await guild.members.fetch(user);
     if (!member) {
       await interaction.reply({
         content: `Error: ${user} is not a member of this server`,
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const durationMilliseconds =
-      duration * TimeoutCommand.MillisecondsByUnit.get(unit)!;
-    const readableDuration = `${duration} ${unit}${duration !== 1 ? 's' : ''}`;
-    if (durationMilliseconds > TimeoutCommand.MaxTimeoutMilliseconds) {
-      await interaction.reply({
-        content: `Error: ${readableDuration} is greater than the maximum timeout duration (28 days)`,
         ephemeral: true,
       });
       return;
@@ -65,6 +44,8 @@ export class TimeoutCommand extends Command {
       return;
     }
 
+    if (!purge) purge = false;
+
     const userLog = await moderationLogs.findOne(
       { '_id.guild': interaction.guildId!, '_id.user': member.id },
     );
@@ -75,9 +56,8 @@ export class TimeoutCommand extends Command {
           guild: interaction.guildId!,
           user: member.id,
         },
-        timeout: [{
+        ban: [{
           date: new Date(),
-          duration: readableDuration,
           user: interaction.user.id,
           reason: reason
         }]
@@ -87,9 +67,8 @@ export class TimeoutCommand extends Command {
     } else {
       moderationLogs.updateOne({ '_id.guild': interaction.guildId!, '_id.user': member.id }, {
         $push: {
-          "timeout": {
+          "ban": {
             date: new Date(),
-            duration: readableDuration,
             user: interaction.user.id,
             reason: reason
           }
@@ -97,36 +76,27 @@ export class TimeoutCommand extends Command {
       });
     }
 
-    await member.timeout(durationMilliseconds, reason ?? undefined);
-    const expiration = new Date(interaction.createdTimestamp + durationMilliseconds);
-
     const embed = new EmbedBuilder()
-            .setColor(Color.Red)
-            .setTitle('You Have Been Timed Out')
-            .addFields(
-                { name: 'Server', value: `${guild.name}` },
-                { name: 'Reason', value: reason },
-                {name: 'Duration', value: readableDuration},
-                {
-                  name: 'Expiration',
-                  value: time(expiration, TimestampStyles.RelativeTime),
-                  inline: true,
-                },
-            )
-            .setTimestamp(interaction.createdTimestamp);
+      .setColor(Color.Red)
+      .setTitle('You Have Been Banned')
+      .addFields(
+        { name: 'Server', value: `${guild.name}` },
+        { name: 'Reason', value: reason },
+      )
+      .setTimestamp(interaction.createdTimestamp);
 
-        await member.send({ embeds: [embed] });
+    await member.send({ embeds: [embed] });
+
+    (purge) ? await member.ban({ deleteMessageSeconds: 604800, reason: reason }) : await member.ban({ reason: reason });
 
     await interaction.reply({
-      content: `${user.tag} timed out for ${readableDuration}`,
+      content: `${user.tag} banned`,
       ephemeral: true,
     });
 
-    await messageLogger.logMemberTimeout(
+    await messageLogger.logMemberBan(
       member,
       interaction.user,
-      durationMilliseconds,
-      readableDuration,
       reason,
       interaction.createdTimestamp
     );
@@ -144,30 +114,16 @@ export class TimeoutCommand extends Command {
               .setDescription('The user to timeout')
               .setRequired(true)
           )
-          .addNumberOption(duration =>
-            duration
-              .setName(Option.Duration)
-              .setDescription('The duration of the timeout')
-              .setRequired(true)
-              .setMinValue(0)
-          )
-          .addStringOption(unit =>
-            unit
-              .setName(Option.Unit)
-              .setDescription('The unit of the timeout duration')
-              .setRequired(true)
-              .setChoices(
-                ...[...TimeoutCommand.MillisecondsByUnit.keys()].map(name => ({
-                  name,
-                  value: name,
-                }))
-              )
-          )
           .addStringOption(reason =>
             reason
               .setName(Option.Reason)
-              .setDescription('The reason for timing them out')
+              .setDescription('The reason for banning them')
               .setRequired(true)
+          )
+          .addBooleanOption(purge =>
+            purge
+              .setName(Option.Purge)
+              .setDescription('Purge their messages?')
           ),
       { idHints: [] }
     );
@@ -176,7 +132,6 @@ export class TimeoutCommand extends Command {
 
 enum Option {
   User = 'user',
-  Duration = 'duration',
-  Unit = 'unit',
   Reason = 'reason',
+  Purge = 'purge',
 }
