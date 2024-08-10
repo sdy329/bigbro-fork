@@ -7,40 +7,40 @@ import {
   EmbedBuilder,
   time,
   TimestampStyles,
-  type ThreadChannel,
   type Guild,
   type GuildMember,
   type Message,
   type PartialMessage,
+  type ThreadChannel,
   type User,
-} from 'discord.js';
-import { Color } from './embeds';
-import type { SettingsManager } from './settings';
-import { userUrl } from './user';
+} from "discord.js";
+import { Color } from "./embeds.js";
+import type { SettingsManager } from "./settings.js";
+import { userUrl } from "./user.js";
 
 export class MessageLogger {
   public constructor(private readonly settingsManager: SettingsManager) { }
 
   public async logMessageDelete(
     message: Message | PartialMessage,
-    executor?: User
+    executor?: User,
   ) {
     await this.logMessageChange(
       message,
       MessageChangeType.Deleted,
       Date.now(),
-      executor
+      executor,
     );
   }
 
   public async logMessageUpdate(
     oldMessage: Message | PartialMessage,
-    timestamp: Date | number | null
+    timestamp: Date | number | null,
   ) {
     await this.logMessageChange(
       oldMessage,
       MessageChangeType.Updated,
-      timestamp
+      timestamp,
     );
   }
 
@@ -76,7 +76,7 @@ export class MessageLogger {
     durationMilliseconds: number,
     readableDuration: string,
     reason: string | null,
-    executedTimestamp: number
+    executedTimestamp: number,
   ) {
     const logChannel = await this.channelForGuild(member.guild);
     if (!logChannel) {
@@ -89,19 +89,19 @@ export class MessageLogger {
       .setTitle('Member Timed Out')
       .setThumbnail((member ?? member).displayAvatarURL())
       .addFields(
-        { name: 'Member', value: `${member} (${member.user.tag})` },
-        { name: 'Performed By', value: `${executor}`, inline: true },
-        { name: 'Duration', value: readableDuration },
+        { name: "Member", value: `${member} (${member.user.tag})` },
+        { name: "Performed By", value: `${executor}`, inline: true },
+        { name: "Duration", value: readableDuration },
         {
-          name: 'Expiration',
+          name: "Expiration",
           value: time(expiration, TimestampStyles.RelativeTime),
           inline: true,
-        }
+        },
       )
       .setFooter({ text: `User ID: ${member.id}` })
       .setTimestamp(executedTimestamp);
     if (reason) {
-      embed.addFields({ name: 'Reason', value: reason });
+      embed.addFields({ name: "Reason", value: reason });
     }
 
     await logChannel.send({ embeds: [embed] });
@@ -137,7 +137,7 @@ export class MessageLogger {
     message: Message | PartialMessage,
     type: MessageChangeType,
     timestamp: Date | number | null,
-    executor?: User
+    executor?: User,
   ) {
     if (message.partial || message.author.bot || !message.inGuild()) {
       return;
@@ -148,7 +148,7 @@ export class MessageLogger {
       return;
     }
 
-    const executorString = executor ? ` by ${executor}` : '';
+    const executorString = executor ? ` by ${executor}` : "";
 
     await logChannel.send({
       files: message.attachments.map(({ proxyURL }) => proxyURL),
@@ -163,16 +163,16 @@ export class MessageLogger {
           .setDescription(
             [
               bold(
-                `Message by ${message.author} ${type}${executorString} in ${message.channel}`
+                `Message by ${message.author} ${type}${executorString} in ${message.channel}`,
               ),
               message.content,
-            ].join('\n')
+            ].join("\n"),
           )
           .setFooter({
             text: [
               `User ID: ${message.author.id}`,
               `Message ID: ${message.id}`,
-            ].join(' | '),
+            ].join(" | "),
           })
           .setTimestamp(timestamp),
       ],
@@ -180,8 +180,8 @@ export class MessageLogger {
         new ActionRowBuilder<ButtonBuilder>().setComponents(
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
-            .setLabel('Message')
-            .setURL(message.url)
+            .setLabel("Message")
+            .setURL(message.url),
         ),
       ],
     });
@@ -193,7 +193,7 @@ export class MessageLogger {
     title: string,
     ID: string,
     description: string,
-    executedTimestamp: number
+    executedTimestamp: number,
   ) {
     const logChannel = await this.channelForGuild(member.guild);
     if (!logChannel) {
@@ -202,11 +202,11 @@ export class MessageLogger {
 
     const embed = new EmbedBuilder()
       .setColor(Color.Yellow)
-      .setTitle('Member Created a Ticket')
+      .setTitle("Member Created a Ticket")
       .addFields(
-        { name: 'Member', value: `${member} (${member.user.tag})` },
-        { name: 'Title', value: `${title} - ${ID}` },
-        { name: 'Reason', value: description },
+        { name: "Member", value: `${member} (${member.user.tag})` },
+        { name: "Title", value: `${title} - ${ID}` },
+        { name: "Reason", value: description },
       )
       .setFooter({ text: `User ID: ${member.id}` })
       .setTimestamp(executedTimestamp);
@@ -214,9 +214,9 @@ export class MessageLogger {
     const component = new ActionRowBuilder<ButtonBuilder>().setComponents(
       new ButtonBuilder()
         .setStyle(ButtonStyle.Link)
-        .setLabel('Ticket')
-        .setURL(thread.url)
-    )
+        .setLabel("Ticket")
+        .setURL(thread.url),
+    );
 
     await logChannel.send({ embeds: [embed], components: [component] });
   }
@@ -226,7 +226,7 @@ export class MessageLogger {
     thread: ThreadChannel,
     title: string,
     description: string,
-    executedTimestamp: number
+    executedTimestamp: number,
   ) {
     const logChannel = await this.channelForGuild(member.guild);
     if (!logChannel) {
@@ -235,11 +235,11 @@ export class MessageLogger {
 
     const embed = new EmbedBuilder()
       .setColor(Color.Red)
-      .setTitle('Member Closed a Ticket')
+      .setTitle("Member Closed a Ticket")
       .addFields(
-        { name: 'Member', value: `${member} (${member.user.tag})` },
-        { name: 'Title', value: title },
-        { name: 'Reason', value: description },
+        { name: "Member", value: `${member} (${member.user.tag})` },
+        { name: "Title", value: title },
+        { name: "Reason", value: description },
       )
       .setFooter({ text: `User ID: ${member.id}` })
       .setTimestamp(executedTimestamp);
@@ -247,9 +247,9 @@ export class MessageLogger {
     const component = new ActionRowBuilder<ButtonBuilder>().setComponents(
       new ButtonBuilder()
         .setStyle(ButtonStyle.Link)
-        .setLabel('Ticket')
-        .setURL(thread.url)
-    )
+        .setLabel("Ticket")
+        .setURL(thread.url),
+    );
 
     await logChannel.send({ embeds: [embed], components: [component] });
   }
@@ -282,7 +282,7 @@ export class MessageLogger {
 }
 
 enum MessageChangeType {
-  Created = 'created',
-  Deleted = 'deleted',
-  Updated = 'updated',
+  Created = "created",
+  Deleted = "deleted",
+  Updated = "updated",
 }
