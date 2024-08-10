@@ -8,7 +8,7 @@ import {
 import { Color } from '../lib/embeds';
 import { messageLogger } from '..';
 import { moderationLogs } from '..';
-import type { ModerationLog } from '../lib/moderation';
+import type { warnLog } from '../lib/moderation';
 
 @ApplyOptions<Command.Options>({
     description: 'Warn user',
@@ -44,35 +44,23 @@ export class WarnCommand extends Command {
             return;
         }
 
-        const userLog = await moderationLogs.findOne(
-            { '_id.guild': interaction.guildId!, '_id.user': member.id },
-        );
+        const filter = { '_id.guild': interaction.guildId!, '_id.user': member.id };
 
-        if (!userLog) {
-            const ModerationEntry: ModerationLog = {
-                _id: {
-                    guild: interaction.guildId!,
-                    user: member.id,
-                },
-                warning: [{
-                    date: new Date(),
-                    user: interaction.user.id,
-                    reason: reason
-                }]
-            };
+        const userWarning: warnLog = {
+            date: new Date(),
+            user: interaction.user.id,
+            reason: reason
+        };
 
-            await moderationLogs.insertOne(ModerationEntry);
-        } else {
-            moderationLogs.updateOne({ '_id.guild': interaction.guildId!, '_id.user': member.id }, {
-                $push: {
-                    "warning": {
-                        date: new Date(),
-                        user: interaction.user.id,
-                        reason: reason
-                    }
-                }
-            });
-        }
+        const update = {
+            $push: {
+                warning: userWarning
+            }
+        };
+
+        const options = { upsert: true };
+
+        moderationLogs.findOneAndUpdate(filter, update, options);
 
         await interaction.reply({
             content: `${user.tag} warned for ${reason}`,
@@ -90,7 +78,7 @@ export class WarnCommand extends Command {
 
         await member.send({ embeds: [embed] });
 
-        await messageLogger.logMemberWarning(
+        messageLogger.logMemberWarning(
             member,
             interaction.user,
             reason,

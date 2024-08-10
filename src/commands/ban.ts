@@ -8,7 +8,7 @@ import {
 import { Color } from '../lib/embeds';
 import { messageLogger } from '..';
 import { moderationLogs } from '..';
-import type { ModerationLog } from '../lib/moderation';
+import type { banLog } from '../lib/moderation';
 
 @ApplyOptions<Command.Options>({
   description: 'Ban user',
@@ -44,38 +44,26 @@ export class BanCommand extends Command {
       });
       return;
     }
+    let purgeTime: number;
+    purgeTime = (!purge) ? 0 : 604800;
 
-    if (!purge) purge = false;
+    const filter = { '_id.guild': interaction.guildId!, '_id.user': member.id };
 
-    const userLog = await moderationLogs.findOne(
-      { '_id.guild': interaction.guildId!, '_id.user': member.id },
-    );
+    const userBan: banLog = {
+      date: new Date(),
+      user: interaction.user.id,
+      reason: reason
+    };
 
-    if (!userLog) {
-      const ModerationEntry: ModerationLog = {
-        _id: {
-          guild: interaction.guildId!,
-          user: member.id,
-        },
-        ban: [{
-          date: new Date(),
-          user: interaction.user.id,
-          reason: reason
-        }]
-      };
+    const update = {
+      $push: {
+        ban: userBan
+      }
+    };
 
-      await moderationLogs.insertOne(ModerationEntry);
-    } else {
-      moderationLogs.updateOne({ '_id.guild': interaction.guildId!, '_id.user': member.id }, {
-        $push: {
-          "ban": {
-            date: new Date(),
-            user: interaction.user.id,
-            reason: reason
-          }
-        }
-      });
-    }
+    const options = { upsert: true };
+
+    moderationLogs.findOneAndUpdate(filter, update, options);
 
     const embed = new EmbedBuilder()
       .setColor(Color.Red)
@@ -88,7 +76,7 @@ export class BanCommand extends Command {
 
     await member.send({ embeds: [embed] });
 
-    (purge) ? await member.ban({ deleteMessageSeconds: 604800, reason: reason }) : await member.ban({ reason: reason });
+    await member.ban({ deleteMessageSeconds: purgeTime, reason: reason })
 
     await interaction.reply({
       content: `${user.tag} banned`,

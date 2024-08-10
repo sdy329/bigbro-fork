@@ -87,44 +87,10 @@ export class MessageLogger {
     const embed = new EmbedBuilder()
       .setColor(Color.Red)
       .setTitle('Member Timed Out')
-      .addFields(
-        { name: 'Member', value: `${member} (${member.user.tag})` },
-        { name: 'Performed By', value: `${executor}`, inline: true },
-        { name: 'Duration', value: readableDuration },
-        {
-          name: 'Expiration',
-          value: time(expiration, TimestampStyles.RelativeTime),
-          inline: true,
-        }
-      )
-      .setFooter({ text: `User ID: ${member.id}` })
-      .setTimestamp(executedTimestamp);
-    if (reason) {
-      embed.addFields({ name: 'Reason', value: reason });
-    }
-
-    await logChannel.send({ embeds: [embed] });
-  }
-
-  public async logMemberSelfTimeout(
-    member: GuildMember,
-    durationMilliseconds: number,
-    readableDuration: string,
-    reason: string,
-    executedTimestamp: number
-  ) {
-    const logChannel = await this.channelForGuild(member.guild);
-    if (!logChannel) {
-      return;
-    }
-
-    const expiration = new Date(executedTimestamp + durationMilliseconds);
-    const embed = new EmbedBuilder()
-      .setColor(Color.Red)
-      .setTitle('Member Timed Themself Out')
       .setThumbnail((member ?? member).displayAvatarURL())
       .addFields(
         { name: 'Member', value: `${member} (${member.user.tag})` },
+        { name: 'Performed By', value: `${executor}`, inline: true },
         { name: 'Duration', value: readableDuration },
         {
           name: 'Expiration',

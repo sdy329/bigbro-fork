@@ -11,7 +11,7 @@ import { Color } from '../lib/embeds';
 import { DurationUnit } from '../lib/duration';
 import { messageLogger } from '..';
 import { moderationLogs } from '..';
-import type { ModerationLog } from '../lib/moderation';
+import type { timeoutLog } from '../lib/moderation';
 
 
 @ApplyOptions<Command.Options>({
@@ -65,64 +65,51 @@ export class TimeoutCommand extends Command {
       return;
     }
 
-    const userLog = await moderationLogs.findOne(
-      { '_id.guild': interaction.guildId!, '_id.user': member.id },
-    );
+    const filter = { '_id.guild': interaction.guildId!, '_id.user': member.id };
 
-    if (!userLog) {
-      const ModerationEntry: ModerationLog = {
-        _id: {
-          guild: interaction.guildId!,
-          user: member.id,
-        },
-        timeout: [{
-          date: new Date(),
-          duration: readableDuration,
-          user: interaction.user.id,
-          reason: reason
-        }]
-      };
+    const userTimeout: timeoutLog = {
+      date: new Date(),
+      duration: readableDuration,
+      user: interaction.user.id,
+      reason: reason
+    };
 
-      await moderationLogs.insertOne(ModerationEntry);
-    } else {
-      moderationLogs.updateOne({ '_id.guild': interaction.guildId!, '_id.user': member.id }, {
-        $push: {
-          "timeout": {
-            date: new Date(),
-            duration: readableDuration,
-            user: interaction.user.id,
-            reason: reason
-          }
-        }
-      });
-    }
+    const update = {
+      $push: {
+        timeout: userTimeout
+      }
+    };
+
+    const options = { upsert: true };
+
+    moderationLogs.findOneAndUpdate(filter, update, options);
 
     await member.timeout(durationMilliseconds, reason ?? undefined);
     const expiration = new Date(interaction.createdTimestamp + durationMilliseconds);
 
     const embed = new EmbedBuilder()
-            .setColor(Color.Red)
-            .setTitle('You Have Been Timed Out')
-            .addFields(
-                { name: 'Server', value: `${guild.name}` },
-                { name: 'Reason', value: reason },
-                {name: 'Duration', value: readableDuration},
-                {
-                  name: 'Expiration',
-                  value: time(expiration, TimestampStyles.RelativeTime),
-                  inline: true,
-                },
-            )
-            .setTimestamp(interaction.createdTimestamp);
+      .setColor(Color.Red)
+      .setTitle('You Have Been Timed Out')
+      .addFields(
+        { name: 'Server', value: `${guild.name}` },
+        { name: 'Reason', value: reason },
+        { name: 'Duration', value: readableDuration },
+        {
+          name: 'Expiration',
+          value: time(expiration, TimestampStyles.RelativeTime),
+          inline: true,
+        },
+      )
+      .setTimestamp(interaction.createdTimestamp);
 
-        await member.send({ embeds: [embed] });
+    await member.send({ embeds: [embed] });
 
     await interaction.reply({
       content: `${user.tag} timed out for ${readableDuration}`,
       ephemeral: true,
     });
 
-    await messageLogger.logMemberTimeout(
+    messageLogger.logMemberTimeout(
       member,
       interaction.user,
       durationMilliseconds,
