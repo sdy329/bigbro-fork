@@ -17,9 +17,9 @@ import {
 } from 'discord.js';
 import type { AbstractCursor } from 'mongodb';
 import { messageCounts } from '..';
-import type { MessageCount } from '../lib/leaderboard';/*
+import type { MessageCount } from '../lib/leaderboard';
 import { moderationLogs } from '..';
-import type { ModerationLog } from '../lib/moderation';*/
+//import type { ModerationLog } from '../lib/moderation';
 import { userUrl } from '../lib/user';
 
 @ApplyOptions<Command.Options>({
@@ -47,9 +47,19 @@ export class LogsCommand extends Command {
             return;
         }
 
+        const userLog = await moderationLogs.findOne({ guild: interaction.guildId, user: member.id });
+
+        if (!userLog) {
+            await interaction.reply({
+                content: `No moderation history found for ${user}`,
+                ephemeral: true,
+            });
+            return;
+        }
+
         await interaction.deferReply({ ephemeral: true });
 
-        let page = 0;
+        let logPage = 0;
         const leaderboardUsers = messageCounts
             .aggregate<MessageCount>()
             .match({ '_id.guild': interaction.guildId, '_id.user': member.id })
@@ -64,7 +74,7 @@ export class LogsCommand extends Command {
                     .setTitle(Logs.Title)
                     .setDescription(
                         await this.page(
-                            page,
+                            logPage,
                             leaderboardUsers,
                             await guild.members.fetch(),
                             cachedPages
@@ -73,7 +83,7 @@ export class LogsCommand extends Command {
             ],
             components: [
                 await this.selectActionRow(),
-                await this.buttonActionRow(page, leaderboardUsers, cachedPages.length),
+                await this.buttonActionRow(logPage, leaderboardUsers, cachedPages.length),
             ],
         });
         const reply = await interaction.editReply({
@@ -85,9 +95,9 @@ export class LogsCommand extends Command {
         collector.on('collect', async i => {
             await i.deferUpdate();
             if (i.customId === Logs.ButtonPrev) {
-                page--;
+                logPage--;
             } else if (i.customId === Logs.ButtonNext) {
-                page++;
+                logPage++;
             }
             await i.editReply(await replyOptions());
         });
