@@ -22,10 +22,6 @@ import type { timeoutLog } from '../lib/moderation';
 })
 export class TimeoutCommand extends Command {
   private static readonly MaxTimeoutMilliseconds = 2_419_200_000; // 28 days
-  private static readonly MillisecondsByUnit = DurationUnit.values().reduce(
-    (map, unit) => map.set(unit.name, unit.milliseconds),
-    new Map<string, number>(),
-  );
 
   public override async chatInputRun(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild()) {
@@ -46,8 +42,16 @@ export class TimeoutCommand extends Command {
       return;
     }
 
-    const durationMilliseconds =
-      duration * TimeoutCommand.MillisecondsByUnit.get(unit)!;
+    const durationUnit = DurationUnit.fromName(unit);
+    if (!durationUnit) {
+      await interaction.reply({
+        content: `Error: ${unit} is not a valid duration unit (${DurationUnit.values().join(", ")})`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const durationMilliseconds = durationUnit.millisFromCount(duration);
     const readableDuration = `${duration} ${unit}${duration !== 1 ? "s" : ""}`;
     if (durationMilliseconds > TimeoutCommand.MaxTimeoutMilliseconds) {
       await interaction.reply({
@@ -144,12 +148,10 @@ export class TimeoutCommand extends Command {
               .setDescription("The unit of the timeout duration")
               .setRequired(true)
               .setChoices(
-                ...[...TimeoutCommand.MillisecondsByUnit.keys()].map(
-                  (name) => ({
-                    name,
-                    value: name,
-                  }),
-                ),
+                DurationUnit.values().map(({ name }) => ({
+                  name,
+                  value: name,
+                })),
               ),
           )
           .addStringOption((reason) =>
